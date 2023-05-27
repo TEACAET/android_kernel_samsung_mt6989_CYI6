@@ -1602,6 +1602,8 @@ retry:
 		context_destroy(&context);
 		goto retry;
 	}
+	if (context.str == str_onstack)
+		context.str = NULL;
 	context_destroy(&context);
 out_unlock:
 	rcu_read_unlock();
