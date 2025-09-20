@@ -198,6 +198,8 @@ struct scan_control {
  */
 int vm_swappiness = 60;
 
+struct kcompress_t kcompress_data[MAX_NUMNODES];
+
 static void set_task_reclaim_state(struct task_struct *task,
 				   struct reclaim_state *rs)
 {
@@ -8178,11 +8180,15 @@ unsigned long shrink_all_memory(unsigned long nr_to_reclaim)
 /*
  * This kswapd start function will be called by init and node-hot-add.
  */
+/*
+ * This kswapd start function will be called by init and node-hot-add.
+ */
 void kswapd_run(int nid)
 {
 	pg_data_t *pgdat = NODE_DATA(nid);
 	bool skip = false;
-
+	int ret = 0;
+ 
 	pgdat_kswapd_lock(pgdat);
 	if (!pgdat->kswapd) {
 		trace_android_vh_kswapd_per_node(nid, &skip, true);
@@ -8190,42 +8196,78 @@ void kswapd_run(int nid)
 			pgdat_kswapd_unlock(pgdat);
 			return;
 		}
-
+ 
 		pgdat->kswapd = kthread_run(kswapd, pgdat, "kswapd%d", nid);
 		if (IS_ERR(pgdat->kswapd)) {
 			/* failure at boot is fatal */
 			BUG_ON(system_state < SYSTEM_RUNNING);
 			pr_err("Failed to start kswapd on node %d\n", nid);
 			pgdat->kswapd = NULL;
+			/* 注意：即使 kswapd 创建失败，仍然继续创建 kcompressd */
+		}
+ 
+		/* 新增的 kfifo 分配和 kcompressd 创建逻辑 */
+		ret = kfifo_alloc(&kcompress_data[nid].kcompress_fifo,
+				KCOMPRESS_FIFO_SIZE * sizeof(struct page *),
+				GFP_KERNEL);
+		if (ret) {
+			pr_err("%s: fail to kfifo_alloc\n", __func__);
+			/* 如果 kfifo 分配失败，不返回，继续执行后续逻辑 */
+		}
+ 
+		kcompress_data[nid].kcompressd = kthread_create_on_node(kcompressd, pgdat, nid,
+			"kcompressd%d", nid);
+		if (IS_ERR(kcompress_data[nid].kcompressd)) {
+			pr_err("Failed to start kcompressd on node %d，ret=%ld\n",
+					nid, PTR_ERR(kcompress_data[nid].kcompressd));
+			kcompress_data[nid].kcompressd = NULL;
+			kfifo_free(&kcompress_data[nid].kcompress_fifo);
+		} else {
+			wake_up_process(kcompress_data[nid].kcompressd);
 		}
 	}
 	pgdat_kswapd_unlock(pgdat);
 }
-
 /*
  * Called by memory hotplug when all memory in a node is offlined.  Caller must
  * be holding mem_hotplug_begin/done().
  */
-void kswapd_stop(int nid)
-{
-	pg_data_t *pgdat = NODE_DATA(nid);
-	struct task_struct *kswapd;
-	bool skip = false;
-
-	pgdat_kswapd_lock(pgdat);
-	kswapd = pgdat->kswapd;
-
-	trace_android_vh_kswapd_per_node(nid, &skip, false);
-	if (skip) {
-		pgdat_kswapd_unlock(pgdat);
-		return;
-	}
-	if (kswapd) {
-		kthread_stop(kswapd);
-		pgdat->kswapd = NULL;
-	}
-	pgdat_kswapd_unlock(pgdat);
-}
+ void kswapd_stop(int nid)
+ {
+	 pg_data_t *pgdat = NODE_DATA(nid);
+	 struct task_struct *kswapd;
+	 bool skip = false;
+ 
+	 /* 处理多 kswapd 线程情况 */
+	 if (kswapd_threads > 1) {
+		 kswapd_per_node_stop(nid);
+		 return;
+	 }
+ 
+	 pgdat_kswapd_lock(pgdat);
+	 kswapd = pgdat->kswapd;
+ 
+	 trace_android_vh_kswapd_per_node(nid, &skip, false);
+	 if (skip) {
+		 pgdat_kswapd_unlock(pgdat);
+		 return;
+	 }
+ 
+	 /* 停止 kswapd 线程 */
+	 if (kswapd) {
+		 kthread_stop(kswapd);
+		 pgdat->kswapd = NULL;
+	 }
+ 
+	 /* 停止 kcompressd 线程并清理资源 */
+	 if (pgdat->kcompressd) {
+		 kthread_stop(pgdat->kcompressd);
+		 pgdat->kcompressd = NULL;
+		 kfifo_free(&pgdat->kcompress_fifo);
+	 }
+ 
+	 pgdat_kswapd_unlock(pgdat);
+ }
 
 static int __init kswapd_init(void)
 {
