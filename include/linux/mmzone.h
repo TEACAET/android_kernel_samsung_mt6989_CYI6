@@ -21,7 +21,6 @@
 #include <linux/atomic.h>
 #include <linux/mm_types.h>
 #include <linux/page-flags.h>
-#include <linux/kfifo.h>
 #include <linux/local_lock.h>
 #include <linux/android_kabi.h>
 #include <asm/page.h>
@@ -1355,13 +1354,6 @@ typedef struct pglist_data {
 	struct memory_tier __rcu *memtier;
 #endif
 } pg_data_t;
-
-#define KCOMPRESS_FIFO_SIZE 256
-struct kcompress_t {
-	wait_queue_head_t kcompressd_wait;
-	struct task_struct *kcompressd;
-	struct kfifo kcompress_fifo;
-};
 
 #define node_present_pages(nid)	(NODE_DATA(nid)->node_present_pages)
 #define node_spanned_pages(nid)	(NODE_DATA(nid)->node_spanned_pages)

@@ -467,8 +467,6 @@ int add_swap_extent(struct swap_info_struct *sis, unsigned long start_page,
 int generic_swapfile_activate(struct swap_info_struct *, struct file *,
 		sector_t *);
 
-int kcompressd(void *p);
-
 static inline unsigned long total_swapcache_pages(void)
 {
 	return global_node_page_state(NR_SWAPCACHE);
@@ -624,12 +622,6 @@ static inline int add_swap_extent(struct swap_info_struct *sis,
 {
 	return -EINVAL;
 }
-
-static inline int kcompressd(void *p)
-{
-	return 0;
-}
-
 #endif /* CONFIG_SWAP */
 
 #ifdef CONFIG_THP_SWAP
