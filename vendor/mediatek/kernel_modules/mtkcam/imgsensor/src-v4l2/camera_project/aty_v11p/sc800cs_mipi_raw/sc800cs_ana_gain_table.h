@@ -1,0 +1,31 @@
+/* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * Copyright (c) 2019 MediaTek Inc.
+ */
+/*****************************************************************************
+ *
+ * Filename:
+ * ---------
+ *	 sc800cs_ana_gain_table.h
+ *
+ * Project:
+ * --------
+ * Description:
+ * ------------
+ *	 Analog Gain Table
+ *
+ ****************************************************************************/
+#ifndef __SC800CS_ANA_GAIN_TABLE_H__
+#define __SC800CS_ANA_GAIN_TABLE_H__
+
+#include "kd_camera_typedef.h"
+
+static kal_uint32 sc800cs_ana_gain_table[] = {
+	1024,
+	2048,
+	4096,
+	8192,
+	16384,
+	32768,
+};
+#endif
