@@ -457,7 +457,7 @@ static inline bool node_reclaim_enabled(void)
 void check_move_unevictable_folios(struct folio_batch *fbatch);
 void check_move_unevictable_pages(struct pagevec *pvec);
 
-extern void kswapd_run(int nid);
+extern int kswapd_run(int nid);
 extern void kswapd_stop(int nid);
 
 #ifdef CONFIG_SWAP
@@ -466,6 +466,7 @@ int add_swap_extent(struct swap_info_struct *sis, unsigned long start_page,
 		unsigned long nr_pages, sector_t start_block);
 int generic_swapfile_activate(struct swap_info_struct *, struct file *,
 		sector_t *);
+int kcompressd(void *p);
 
 static inline unsigned long total_swapcache_pages(void)
 {
@@ -622,6 +623,12 @@ static inline int add_swap_extent(struct swap_info_struct *sis,
 {
 	return -EINVAL;
 }
+
+static inline int kcompressd(void *p)
+{
+	return 0;
+}
+
 #endif /* CONFIG_SWAP */
 
 #ifdef CONFIG_THP_SWAP

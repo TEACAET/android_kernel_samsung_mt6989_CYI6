@@ -216,6 +216,8 @@ static u64 workingset_protection_prev_totalram __read_mostly = 0;
  */
 int vm_swappiness = 60;
 
+struct kcompress_t kcompress_data[MAX_NUMNODES];
+
 static void set_task_reclaim_state(struct task_struct *task,
 				   struct reclaim_state *rs)
 {
@@ -8310,17 +8312,18 @@ unsigned long shrink_all_memory(unsigned long nr_to_reclaim)
 /*
  * This kswapd start function will be called by init and node-hot-add.
  */
-void kswapd_run(int nid)
+int kswapd_run(int nid)
 {
 	pg_data_t *pgdat = NODE_DATA(nid);
 	bool skip = false;
+	int ret = 0;
 
 	pgdat_kswapd_lock(pgdat);
 	if (!pgdat->kswapd) {
 		trace_android_vh_kswapd_per_node(nid, &skip, true);
 		if (skip) {
 			pgdat_kswapd_unlock(pgdat);
-			return;
+			return 0;
 		}
 
 		pgdat->kswapd = kthread_run(kswapd, pgdat, "kswapd%d", nid);
@@ -8328,10 +8331,37 @@ void kswapd_run(int nid)
 			/* failure at boot is fatal */
 			BUG_ON(system_state < SYSTEM_RUNNING);
 			pr_err("Failed to start kswapd on node %d\n", nid);
+			ret = PTR_ERR(pgdat->kswapd);
 			pgdat->kswapd = NULL;
+			pgdat_kswapd_unlock(pgdat);
+			return ret;
 		}
 	}
 	pgdat_kswapd_unlock(pgdat);
+
+	if (!kcompress_data[nid].kcompressd) {
+		ret = kfifo_alloc(&kcompress_data[nid].kcompress_fifo,
+				KCOMPRESS_FIFO_SIZE * sizeof(struct page *),
+				GFP_KERNEL);
+		if (ret) {
+			pr_err("%s: fail to kfifo_alloc\n", __func__);
+			return ret;
+		}
+
+		kcompress_data[nid].kcompressd = kthread_create_on_node(kcompressd, pgdat, nid,
+				"kcompressd%d", nid);
+		if (IS_ERR(kcompress_data[nid].kcompressd)) {
+			pr_err("Failed to start kcompressd on node %d,ret=%ld\n",
+					nid, PTR_ERR(kcompress_data[nid].kcompressd));
+			kcompress_data[nid].kcompressd = NULL;
+			kfifo_free(&kcompress_data[nid].kcompress_fifo);
+			ret = 0;
+		} else {
+			wake_up_process(kcompress_data[nid].kcompressd);
+		}
+	}
+
+	return ret;
 }
 
 /*
@@ -8356,6 +8386,11 @@ void kswapd_stop(int nid)
 		kthread_stop(kswapd);
 		pgdat->kswapd = NULL;
 	}
+	if (kcompress_data[nid].kcompressd) {
+		kthread_stop(kcompress_data[nid].kcompressd);
+		kcompress_data[nid].kcompressd = NULL;
+		kfifo_free(&kcompress_data[nid].kcompress_fifo);
+		}
 	pgdat_kswapd_unlock(pgdat);
 }
 
