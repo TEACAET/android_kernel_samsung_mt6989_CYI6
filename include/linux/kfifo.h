@@ -36,6 +36,7 @@
  * to lock the reader.
  */
 
+#ifndef __GENKSYMS__
 #include <linux/array_size.h>
 #include <linux/spinlock.h>
 #include <linux/stddef.h>
@@ -43,6 +44,14 @@
 
 #include <asm/barrier.h>
 #include <asm/errno.h>
+
+struct scatterlist;
+#else
+#include <linux/kernel.h>
+#include <linux/spinlock.h>
+#include <linux/stddef.h>
+#include <linux/scatterlist.h>
+#endif
 
 struct scatterlist;
 
