@@ -211,7 +211,7 @@ static int ashmem_mmap(struct file *file, struct vm_area_struct *vma)
 		     calc_vm_prot_bits(PROT_MASK, 0)))
 		return -EPERM;
 
-	vma->vm_flags &= ~calc_vm_may_flags(~prot_mask);
+	vm_flags_clear(vma, calc_vm_may_flags(~asma->prot_mask));
 
 	if (!READ_ONCE(asma->file)) {
 		int ret = 0;
@@ -317,48 +317,10 @@ static const struct file_operations ashmem_fops = {
 #endif
 };
 
-static const struct file_operations unpinning_enable_fops = {
-	.owner = THIS_MODULE,
-	.open = unpinning_enable_open,
-	.read = attr_read,
-	.write = attr_write,
-};
-
-static const struct file_operations ignore_unset_prot_read_fops = {
-	.owner = THIS_MODULE,
-	.open = ignore_unset_prot_read_open,
-	.read = attr_read,
-	.write = attr_write,
-};
-
-static const struct file_operations ignore_unset_prot_exec_fops = {
-	.owner = THIS_MODULE,
-	.open = ignore_unset_prot_exec_open,
-	.read= attr_read,
-	.write = attr_write,
-};
-
-static struct miscdevice ashmem_miscs[] = {
-	{
-		.minor = MISC_DYNAMIC_MINOR,
-		.name = "ashmem",
-		.fops = &ashmem_fops,
-	},
-	{
-		.minor = MISC_DYNAMIC_MINOR,
-		.name = "ashmem_unpinning_enable",
-		.fops = &unpinning_enable_fops,
-	},
-	{
-		.minor = MISC_DYNAMIC_MINOR,
-		.name = "ashmem_ignore_unset_prot_read",
-		.fops = &ignore_unset_prot_read_fops,
-	},
-	{
-		.minor = MISC_DYNAMIC_MINOR,
-		.name = "ashmem_ignore_unset_prot_exec",
-		.fops = &ignore_unset_prot_exec_fops,
-	},
+static struct miscdevice ashmem_misc = {
+	.minor = MISC_DYNAMIC_MINOR,
+	.name = "ashmem",
+	.fops = &ashmem_fops,
 };
 
 /*
