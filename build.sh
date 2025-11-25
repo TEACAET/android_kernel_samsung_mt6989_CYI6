@@ -3,11 +3,7 @@
 set -e
 
 # download toolchain from https://opensource.samsung.com/uploadSearch?searchValue=toolchain 
-TOOLCHAIN=$(realpath "/home/teacaet/桌面/KERNEL/toolchain/prebuilts")
-
-export PATH=$TOOLCHAIN/build-tools/linux-x86/bin:$PATH
-export PATH=$TOOLCHAIN/build-tools/path/linux-x86:$PATH
-export PATH=$TOOLCHAIN/clang/host/linux-x86/clang-r487747c/bin:$PATH
+export PATH=/home/teacaet/桌面/KERNEL/android-ndk-r29/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH
 
 echo $PATH
 
@@ -24,7 +20,7 @@ ARCH=arm64
 LLVM=1 LLVM_IAS=1
 LOCALVERSION=$LOCALVERSION
 "
-
+clang --version
 # build kernel
 make -j$(nproc) -C $(pwd) O=$(pwd)/out ${ARGS} $TARGET_DEFCONFIG
 
